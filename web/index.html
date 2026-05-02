@@ -314,6 +314,24 @@
     user-select: text; -webkit-user-select: text;
     line-height: 1.5;
   }
+  .modal textarea {
+    display: block; width: 100%; box-sizing: border-box;
+    margin: 0; padding: 12px 14px;
+    background: rgba(0,0,0,0.55);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px; color: var(--fg);
+    line-height: 1.5;
+    resize: vertical;
+    min-height: 220px;
+    outline: none;
+    user-select: text; -webkit-user-select: text;
+  }
+  .modal textarea:focus {
+    border-color: rgba(59,130,246,0.55);
+  }
+  .step-label-actions { display: flex; gap: 6px; }
 
   /* Tiny camera-status indicator */
   .cam-tag {
@@ -359,7 +377,8 @@
     </div>
     <div class="top-actions glass">
       <button id="setup-btn" class="icon-btn" title="Pi setup commands">Pi setup</button>
-      <button id="logout-btn" class="icon-btn close" title="Log out">×</button>
+      <button id="debug-btn" class="icon-btn" title="Debug notes">Debug</button>
+      <button id="logout-btn" class="icon-btn" title="Log out">Log out</button>
     </div>
   </div>
 
@@ -421,6 +440,23 @@
     <p id="setup-missing" style="color: var(--warn); display: none;">
       Pi setup commands aren't available — set <code>MOWER_TOKEN</code> in Vercel env vars and log in again.
     </p>
+  </div>
+</div>
+
+<div class="modal-bg" id="debug-modal">
+  <div class="modal">
+    <h2>Debug notes <button id="debug-close" title="Close">×</button></h2>
+    <p>Scratch pad for shuttling Pi errors / log lines back to the laptop. Auto-saved in this browser only.</p>
+    <div class="step">
+      <div class="step-label">
+        <span>Notes</span>
+        <span class="step-label-actions">
+          <button id="debug-copy" title="Copy all to clipboard">Copy all</button>
+          <button id="debug-clear" title="Clear notes">Clear</button>
+        </span>
+      </div>
+      <textarea id="debug-text" placeholder="Paste error output, journalctl excerpts, anything you want to share back…" spellcheck="false" autocapitalize="off" autocorrect="off"></textarea>
+    </div>
   </div>
 </div>
 
@@ -726,6 +762,48 @@
       btn.classList.add('copied');
       setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1200);
     });
+  });
+
+  // ---- Debug notes ----
+  const DEBUG_KEY = 'mower-debug-notes';
+  const debugTextEl = $('debug-text');
+  debugTextEl.value = localStorage.getItem(DEBUG_KEY) || '';
+  debugTextEl.addEventListener('input', () => {
+    localStorage.setItem(DEBUG_KEY, debugTextEl.value);
+  });
+  $('debug-btn').addEventListener('click', () => {
+    $('debug-modal').classList.add('show');
+    setTimeout(() => debugTextEl.focus(), 0);
+  });
+  $('debug-close').addEventListener('click', () => {
+    $('debug-modal').classList.remove('show');
+  });
+  $('debug-modal').addEventListener('click', (e) => {
+    if (e.target === $('debug-modal')) $('debug-modal').classList.remove('show');
+  });
+  function flashBtn(btn, text, ms) {
+    const orig = btn.textContent;
+    btn.textContent = text;
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, ms || 1200);
+  }
+  $('debug-copy').addEventListener('click', async () => {
+    const text = debugTextEl.value;
+    if (!text) { flashBtn($('debug-copy'), 'Empty'); return; }
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      debugTextEl.select();
+      try { document.execCommand('copy'); } catch {}
+      debugTextEl.setSelectionRange(0, 0);
+    }
+    flashBtn($('debug-copy'), 'Copied');
+  });
+  $('debug-clear').addEventListener('click', () => {
+    if (!debugTextEl.value || confirm('Clear all debug notes?')) {
+      debugTextEl.value = '';
+      localStorage.setItem(DEBUG_KEY, '');
+    }
   });
 
   // ---- Boot ----
