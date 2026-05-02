@@ -6,28 +6,34 @@
 <title>Mower Control</title>
 <style>
   :root {
-    --fg: #f5f5f7;
-    --dim: rgba(245, 245, 247, 0.6);
-    --dimmer: rgba(245, 245, 247, 0.35);
+    --ink: #0e1116;
+    --ink-2: #2b3038;
+    --ink-3: #5b626d;
+    --paper: #ffffff;
+
     --ok: #22c55e;
     --warn: #f59e0b;
     --bad: #ef4444;
-    --accent: #3b82f6;
+    --accent: #2563eb;
     --estop: #dc2626;
 
-    --glass-bg: rgba(18, 18, 22, 0.55);
-    --glass-bg-strong: rgba(18, 18, 22, 0.78);
-    --glass-border: rgba(255, 255, 255, 0.10);
-    --glass-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
-    --glass-blur: blur(22px) saturate(160%);
+    --card-bg: rgba(255, 255, 255, 0.78);
+    --card-border: rgba(255, 255, 255, 0.55);
+    --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0, 0, 0, 0.08);
+    --card-blur: blur(20px) saturate(160%);
+
+    --ink-bg: rgba(14, 17, 22, 0.88);
+    --ink-border: rgba(255, 255, 255, 0.08);
   }
+
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
     margin: 0; padding: 0; height: 100%;
-    background: #000; color: var(--fg);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", sans-serif;
+    background: #0a0a0d; color: var(--ink);
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     overflow: hidden;
     user-select: none; -webkit-user-select: none;
+    -webkit-font-smoothing: antialiased;
   }
 
   /* ---- Video background ---- */
@@ -35,37 +41,47 @@
     position: fixed; inset: 0;
     width: 100%; height: 100%;
     object-fit: cover;
-    z-index: -2;
+    z-index: -3;
     background: #000;
   }
   #bg-video.mirror { transform: scaleX(-1); }
   .bg-overlay {
-    position: fixed; inset: 0; z-index: -1;
+    position: fixed; inset: 0; z-index: -2;
     background:
-      radial-gradient(120% 80% at 50% 0%, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 60%, rgba(0,0,0,0.75) 100%),
-      linear-gradient(180deg, rgba(0,0,0,0.10) 0%, rgba(0,0,0,0.35) 100%);
+      radial-gradient(60% 50% at 50% 55%, rgba(0,0,0,0) 0%, rgba(0,0,0,0.25) 80%, rgba(0,0,0,0.45) 100%),
+      linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.30) 100%);
     pointer-events: none;
+  }
+  .stage-spot {
+    position: fixed; left: 50%; top: 70%;
+    width: 60vw; height: 60vw; max-width: 800px; max-height: 800px;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.06) 40%, rgba(255,255,255,0) 70%);
+    z-index: -1; pointer-events: none;
+    filter: blur(12px);
   }
   .no-video #bg-video { display: none; }
   .no-video::before {
-    content: ''; position: fixed; inset: 0; z-index: -2;
+    content: ''; position: fixed; inset: 0; z-index: -3;
     background:
-      radial-gradient(60% 80% at 30% 20%, rgba(59,130,246,0.18), transparent 60%),
-      radial-gradient(50% 70% at 80% 80%, rgba(220,38,38,0.12), transparent 60%),
-      #0a0a0d;
+      radial-gradient(60% 70% at 30% 25%, rgba(120,180,255,0.15), transparent 60%),
+      radial-gradient(50% 60% at 75% 80%, rgba(255,180,120,0.10), transparent 60%),
+      linear-gradient(180deg, #1a1f2a, #0a0c11);
   }
 
-  /* ---- Glass primitive ---- */
-  .glass {
-    background: var(--glass-bg);
-    -webkit-backdrop-filter: var(--glass-blur);
-    backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--glass-border);
+  /* ---- Card primitives ---- */
+  .card {
+    background: var(--card-bg);
+    -webkit-backdrop-filter: var(--card-blur);
+    backdrop-filter: var(--card-blur);
+    border: 1px solid var(--card-border);
+    box-shadow: var(--card-shadow);
+    color: var(--ink);
     border-radius: 18px;
-    box-shadow: var(--glass-shadow);
   }
+  .pill { border-radius: 999px; }
 
-  /* ---- Login screen ---- */
+  /* ---- Login ---- */
   .screen-login {
     position: fixed; inset: 0;
     display: flex; align-items: center; justify-content: center;
@@ -77,139 +93,191 @@
     border-radius: 22px;
   }
   .login h1 {
-    margin: 0 0 4px; font-size: 24px; font-weight: 600; letter-spacing: -0.02em;
+    margin: 0 0 4px; font-size: 24px; font-weight: 700;
+    letter-spacing: -0.02em; color: var(--ink);
   }
-  .login .sub {
-    color: var(--dim); font-size: 13px; margin: 0 0 20px;
-  }
+  .login .sub { color: var(--ink-3); font-size: 13px; margin: 0 0 20px; }
   .login input {
     width: 100%; padding: 13px 14px; margin-bottom: 10px;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.10);
-    color: var(--fg);
+    background: rgba(255,255,255,0.7);
+    border: 1px solid rgba(0,0,0,0.08);
+    color: var(--ink);
     border-radius: 12px; font-size: 15px;
     transition: border-color 0.15s, background 0.15s;
   }
-  .login input:focus {
-    outline: none;
-    border-color: rgba(59,130,246,0.6);
-    background: rgba(255,255,255,0.08);
-  }
+  .login input::placeholder { color: var(--ink-3); }
+  .login input:focus { outline: none; border-color: var(--accent); background: white; }
   .login button {
     width: 100%; padding: 14px; margin-top: 6px;
-    background: var(--accent); color: white;
+    background: var(--ink); color: white;
     border: none; border-radius: 12px;
     font-size: 15px; font-weight: 600; cursor: pointer;
     transition: filter 0.15s, transform 0.05s;
   }
-  .login button:hover { filter: brightness(1.08); }
+  .login button:hover { filter: brightness(1.15); }
   .login button:active { transform: translateY(1px); }
-  .login button[disabled] { opacity: 0.6; cursor: default; }
-  .login .err {
-    color: var(--bad); font-size: 13px;
-    margin: 10px 0 0; min-height: 18px;
-  }
-  .login .hint {
-    color: var(--dimmer); font-size: 12px; margin-top: 16px; line-height: 1.5;
-  }
+  .login button[disabled] { opacity: 0.55; cursor: default; }
+  .login .err { color: var(--bad); font-size: 13px; margin: 10px 0 0; min-height: 18px; }
+  .login .hint { color: var(--ink-3); font-size: 12px; margin-top: 16px; line-height: 1.5; }
 
-  /* ---- Controls overlay ---- */
+  /* ---- Controls overlay grid ---- */
   .screen-controls {
     position: fixed; inset: 0;
     display: grid;
     grid-template-rows: auto 1fr auto;
     gap: 14px;
-    padding: 14px;
+    padding: 18px;
     pointer-events: none;
   }
   .screen-controls > * { pointer-events: auto; }
 
   /* Top bar */
   .top-bar {
-    display: flex; justify-content: space-between; align-items: center;
-    gap: 10px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center; gap: 12px;
   }
-  .status-pill {
-    display: inline-flex; align-items: center; gap: 14px;
-    padding: 9px 16px;
-    border-radius: 999px;
-    font-size: 13px;
-    font-variant-numeric: tabular-nums;
+  .brand {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 9px 16px; font-size: 13px; width: max-content;
   }
-  .status-pill .label { color: var(--dim); margin-right: 4px; }
-  .status-pill .value { color: var(--fg); font-weight: 500; }
-  .dot {
-    display: inline-block; width: 8px; height: 8px;
-    border-radius: 50%; vertical-align: middle;
-    box-shadow: 0 0 8px currentColor;
+  .brand .mark {
+    width: 22px; height: 22px;
+    background: var(--ink); color: white;
+    border-radius: 6px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 12px; letter-spacing: -0.04em;
   }
-  .dot.ok { background: var(--ok); color: var(--ok); }
-  .dot.warn { background: var(--warn); color: var(--warn); }
-  .dot.bad { background: var(--bad); color: var(--bad); }
+  .brand .b1 { font-weight: 700; color: var(--ink); }
+  .brand .b2 { color: var(--ink-3); }
 
-  .top-actions {
-    display: flex; gap: 6px;
+  .tabs {
+    justify-self: center;
+    display: inline-flex; align-items: center; gap: 2px;
     padding: 6px;
-    border-radius: 999px;
   }
-  .icon-btn {
-    background: transparent; color: var(--dim); border: none;
-    font-size: 13px; font-weight: 500; cursor: pointer;
+  .tab {
+    background: transparent; border: none; cursor: pointer;
+    color: var(--ink-3);
     padding: 7px 14px; border-radius: 999px;
+    font-size: 13px; font-weight: 500;
     transition: background 0.15s, color 0.15s;
   }
-  .icon-btn:hover { background: rgba(255,255,255,0.08); color: var(--fg); }
-  .icon-btn.close { font-size: 18px; line-height: 1; padding: 6px 11px; }
+  .tab:hover:not(:disabled) { color: var(--ink); }
+  .tab:disabled { opacity: 0.45; cursor: not-allowed; }
+  .tab.active { background: var(--ink); color: white; }
 
-  /* Middle row — could host extra widgets later. Empty for now. */
-  .middle-row { display: flex; align-items: center; justify-content: center; }
+  .user-chip {
+    justify-self: end;
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 8px 6px 14px;
+    font-size: 13px; width: max-content;
+  }
+  .user-chip .name { color: var(--ink); font-weight: 500; }
+  .user-chip .menu-btns { display: inline-flex; gap: 2px; }
+  .user-chip button {
+    background: transparent; border: none; cursor: pointer;
+    color: var(--ink-3);
+    padding: 5px 10px; border-radius: 999px;
+    font-size: 12px; font-weight: 500;
+    transition: background 0.15s, color 0.15s;
+  }
+  .user-chip button:hover { background: rgba(0,0,0,0.06); color: var(--ink); }
+  .user-chip .avatar {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: linear-gradient(135deg, #60a5fa, #2563eb);
+    color: white; display: inline-flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700;
+  }
 
-  /* Bottom row: blade/estop on left, d-pad on right */
-  .bottom-row {
+  /* Stage */
+  .stage {
+    display: grid;
+    grid-template-columns: minmax(220px, 280px) 1fr minmax(220px, 280px);
+    align-items: stretch; gap: 14px;
+  }
+  .col-left, .col-right {
+    display: flex; flex-direction: column; gap: 12px;
+    align-self: start;
+  }
+  .ident-card { padding: 18px 20px; }
+  .ident-card .eyebrow {
+    color: var(--ink-3); font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    margin-bottom: 6px;
+  }
+  .ident-card h2 {
+    margin: 0 0 4px; font-size: 26px; font-weight: 700;
+    letter-spacing: -0.02em; color: var(--ink);
+  }
+  .ident-card .sub { color: var(--ink-2); font-size: 13px; }
+
+  .info-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px;
+    font-size: 12px; color: var(--ink-2);
+  }
+  .info-row .ico { width: 14px; height: 14px; flex-shrink: 0; color: var(--ink-3); }
+
+  .stat-card {
+    padding: 14px 16px;
     display: grid;
     grid-template-columns: 1fr auto;
-    gap: 14px;
-    align-items: end;
+    align-items: center; gap: 10px;
   }
-  .action-stack {
-    display: flex; flex-direction: column; gap: 10px;
-    align-self: end;
-    max-width: 280px;
+  .stat-card .stat-label {
+    color: var(--ink-3); font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.07em;
+    grid-column: 1 / 2;
   }
-  .action-btn {
-    padding: 16px 22px;
-    border-radius: 14px;
-    font-size: 15px; font-weight: 600;
-    color: var(--fg); cursor: pointer;
-    border: 1px solid var(--glass-border);
-    background: var(--glass-bg);
-    -webkit-backdrop-filter: var(--glass-blur);
-    backdrop-filter: var(--glass-blur);
-    box-shadow: var(--glass-shadow);
-    transition: filter 0.12s, transform 0.05s;
-    text-align: left;
-    display: flex; align-items: center; gap: 10px;
+  .stat-card .stat-value {
+    grid-column: 1 / 2;
+    color: var(--ink); font-size: 22px; font-weight: 700;
+    letter-spacing: -0.015em; font-variant-numeric: tabular-nums;
   }
-  .action-btn:hover { filter: brightness(1.1); }
-  .action-btn:active { transform: translateY(1px); }
-  .action-btn .swatch {
-    width: 10px; height: 10px; border-radius: 50%;
-    background: var(--dimmer);
+  .stat-card .stat-value .unit {
+    font-size: 12px; color: var(--ink-3); font-weight: 500; margin-left: 4px;
   }
-  .blade-btn.on { background: rgba(245,158,11,0.85); color: #1a1206; border-color: transparent; }
-  .blade-btn.on .swatch { background: #1a1206; }
-  .estop-btn {
-    background: rgba(220,38,38,0.85);
-    border-color: transparent;
-    color: white;
+  .stat-card .stat-icon {
+    grid-row: 1 / 3; grid-column: 2 / 3;
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    background: rgba(0,0,0,0.06);
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--ink-2);
   }
-  .estop-btn .swatch { background: white; }
+  .stat-card.with-dot .stat-value::before {
+    content: ''; display: inline-block; width: 8px; height: 8px;
+    border-radius: 50%; margin-right: 8px; vertical-align: middle;
+    background: var(--ok); box-shadow: 0 0 8px var(--ok);
+  }
+  .stat-card.with-dot.bad .stat-value::before { background: var(--bad); box-shadow: 0 0 8px var(--bad); }
+  .stat-card.with-dot.warn .stat-value::before { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
 
-  /* D-pad */
+  .col-center { display: flex; align-items: flex-end; justify-content: center; pointer-events: none; }
+
+  /* Bottom bar */
+  .bottom-bar {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: end; gap: 14px;
+  }
+  .mini-tiles { display: flex; gap: 8px; flex-wrap: wrap; align-self: end; }
+  .mini-tile {
+    padding: 10px 14px;
+    font-size: 12px; color: var(--ink-2);
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .mini-tile .mt-label { color: var(--ink-3); }
+  .mini-tile .mt-value { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .mini-tile .mt-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); }
+  .mini-tile.ok .mt-dot   { background: var(--ok);   box-shadow: 0 0 6px var(--ok); }
+  .mini-tile.warn .mt-dot { background: var(--warn); box-shadow: 0 0 6px var(--warn); }
+  .mini-tile.bad .mt-dot  { background: var(--bad);  box-shadow: 0 0 6px var(--bad); }
+
   .pad-card {
-    padding: 14px;
-    border-radius: 22px;
-    width: min(320px, 60vw);
+    padding: 14px; border-radius: 24px;
+    width: min(280px, 56vw); justify-self: center;
   }
   .pad {
     display: grid;
@@ -219,97 +287,133 @@
       ".    rev  .";
     grid-template-columns: 1fr 1fr 1fr;
     grid-template-rows: 1fr 1fr 1fr;
-    gap: 6px;
-    aspect-ratio: 1 / 1;
+    gap: 6px; aspect-ratio: 1 / 1;
   }
   .pad button {
-    background: rgba(255,255,255,0.06);
-    color: var(--fg);
-    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.7);
+    color: var(--ink);
+    border: 1px solid rgba(0,0,0,0.05);
     border-radius: 14px;
-    font-size: 28px; font-weight: 500;
+    font-size: 24px; font-weight: 500;
     cursor: pointer;
-    transition: background 0.05s, border-color 0.05s, transform 0.05s;
+    transition: background 0.05s, transform 0.05s, color 0.05s, border-color 0.05s;
     touch-action: manipulation;
     display: flex; align-items: center; justify-content: center;
   }
-  .pad button:hover { background: rgba(255,255,255,0.10); }
+  .pad button:hover { background: white; }
   .pad button:active, .pad button.held {
-    background: rgba(59,130,246,0.85);
-    border-color: rgba(59,130,246,0.85);
-    color: white;
-    transform: scale(0.97);
+    background: var(--ink); border-color: var(--ink); color: white;
+    transform: scale(0.96);
   }
   .pad #btn-fwd  { grid-area: fwd; }
   .pad #btn-rev  { grid-area: rev; }
   .pad #btn-left { grid-area: left; }
   .pad #btn-right{ grid-area: right; }
 
-  /* Portrait / narrow screens — restack */
+  .cta-stack {
+    display: flex; flex-direction: column; gap: 10px;
+    align-items: stretch; justify-self: end;
+    width: max-content; min-width: 200px;
+  }
+  .cta {
+    padding: 14px 22px; border-radius: 14px;
+    font-size: 14px; font-weight: 600;
+    cursor: pointer; border: none;
+    transition: filter 0.12s, transform 0.05s;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    box-shadow: var(--card-shadow);
+  }
+  .cta:hover { filter: brightness(1.10); }
+  .cta:active { transform: translateY(1px); }
+  .cta-blade { background: var(--ink); color: white; }
+  .cta-blade.on { background: var(--warn); color: #1a1206; }
+  .cta-blade .arrow { opacity: 0.7; }
+  .cta-stop { background: var(--estop); color: white; }
+
+  /* Cam tag */
+  .cam-tag {
+    position: fixed; bottom: 14px; left: 14px;
+    z-index: 5;
+    font-size: 11px; color: var(--ink-3);
+    padding: 6px 12px; border-radius: 999px;
+    background: rgba(255,255,255,0.7);
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+    border: 1px solid var(--card-border);
+    pointer-events: auto; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+    box-shadow: var(--card-shadow);
+  }
+  .cam-tag:hover { color: var(--ink); }
+  .cam-tag .cam-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-3); }
+  .cam-tag.live .cam-dot { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .stage { grid-template-columns: 1fr; }
+    .col-left, .col-right { display: none; }
+    .top-bar { grid-template-columns: auto 1fr auto; }
+    .tabs { display: none; }
+  }
   @media (max-width: 640px) {
-    .bottom-row {
-      grid-template-columns: 1fr;
-      gap: 12px;
-    }
+    .bottom-bar { grid-template-columns: 1fr; gap: 10px; }
+    .mini-tiles { justify-content: center; }
     .pad-card { width: 100%; max-width: 100%; }
-    .action-stack { flex-direction: row; max-width: 100%; }
-    .action-stack .action-btn { flex: 1; justify-content: center; text-align: center; }
+    .cta-stack { width: 100%; flex-direction: row; min-width: 0; }
+    .cta { flex: 1; justify-content: center; }
+    .brand .b2 { display: none; }
+    .user-chip .menu-btns { display: none; }
   }
 
-  /* ---- Modal ---- */
+  /* Modal */
   .modal-bg {
     position: fixed; inset: 0;
-    background: rgba(0,0,0,0.55);
-    -webkit-backdrop-filter: blur(8px);
-    backdrop-filter: blur(8px);
+    background: rgba(0,0,0,0.45);
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
     display: none; align-items: center; justify-content: center;
     z-index: 10; padding: 16px;
   }
   .modal-bg.show { display: flex; }
   .modal {
-    background: var(--glass-bg-strong);
-    -webkit-backdrop-filter: var(--glass-blur);
-    backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--glass-border);
+    background: var(--paper);
     border-radius: 20px;
-    box-shadow: var(--glass-shadow);
+    box-shadow: 0 30px 80px rgba(0,0,0,0.5);
     padding: 24px;
     max-width: 680px; width: 100%;
     max-height: 90vh; overflow-y: auto;
+    color: var(--ink);
   }
   .modal h2 {
-    margin: 0 0 6px; font-size: 18px; font-weight: 600;
+    margin: 0 0 6px; font-size: 18px; font-weight: 700;
     display: flex; justify-content: space-between; align-items: center;
+    color: var(--ink);
   }
   .modal h2 button {
-    background: none; color: var(--dim); border: none;
+    background: none; color: var(--ink-3); border: none;
     font-size: 22px; cursor: pointer; padding: 0 4px;
   }
-  .modal h2 button:hover { color: var(--fg); }
-  .modal p { color: var(--dim); font-size: 13px; margin: 4px 0 18px; line-height: 1.5; }
+  .modal h2 button:hover { color: var(--ink); }
+  .modal p { color: var(--ink-3); font-size: 13px; margin: 4px 0 18px; line-height: 1.5; }
   .modal .step { margin-bottom: 14px; }
   .modal .step-label {
-    font-size: 12px; color: var(--dim); margin-bottom: 6px;
+    font-size: 11px; color: var(--ink-3); margin-bottom: 6px;
     display: flex; justify-content: space-between; align-items: center;
-    text-transform: uppercase; letter-spacing: 0.04em;
+    text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600;
   }
   .modal .step-label button {
-    background: rgba(255,255,255,0.08); color: var(--fg);
-    border: 1px solid var(--glass-border);
-    border-radius: 8px;
+    background: var(--ink); color: white;
+    border: none; border-radius: 8px;
     font-size: 11px; font-weight: 600; padding: 5px 12px; cursor: pointer;
     text-transform: none; letter-spacing: normal;
-    transition: background 0.12s;
+    transition: filter 0.12s;
   }
-  .modal .step-label button:hover { background: rgba(255,255,255,0.14); }
-  .modal .step-label button.copied { background: var(--ok); border-color: var(--ok); color: #0a1a0d; }
+  .modal .step-label button:hover { filter: brightness(1.15); }
+  .modal .step-label button.copied { background: var(--ok); color: white; }
   .modal pre {
     margin: 0; padding: 12px 14px;
-    background: rgba(0,0,0,0.55);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 10px;
+    background: #0e1116; color: #e8edf3;
+    border: none; border-radius: 10px;
     font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    font-size: 12px; color: var(--fg);
+    font-size: 12px;
     white-space: pre-wrap; word-break: break-all;
     user-select: text; -webkit-user-select: text;
     line-height: 1.5;
@@ -317,43 +421,28 @@
   .modal textarea {
     display: block; width: 100%; box-sizing: border-box;
     margin: 0; padding: 12px 14px;
-    background: rgba(0,0,0,0.55);
-    border: 1px solid rgba(255,255,255,0.06);
+    background: #f4f5f7;
+    border: 1px solid rgba(0,0,0,0.08);
     border-radius: 10px;
     font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    font-size: 12px; color: var(--fg);
+    font-size: 12px; color: var(--ink);
     line-height: 1.5;
-    resize: vertical;
-    min-height: 220px;
+    resize: vertical; min-height: 220px;
     outline: none;
     user-select: text; -webkit-user-select: text;
   }
-  .modal textarea:focus {
-    border-color: rgba(59,130,246,0.55);
-  }
+  .modal textarea:focus { border-color: var(--accent); }
   .step-label-actions { display: flex; gap: 6px; }
-
-  /* Tiny camera-status indicator */
-  .cam-tag {
-    position: fixed; bottom: 12px; left: 12px;
-    z-index: 5;
-    font-size: 11px; color: var(--dimmer);
-    padding: 4px 10px; border-radius: 999px;
-    background: rgba(0,0,0,0.4);
-    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
-    pointer-events: auto; cursor: pointer;
-    border: 1px solid rgba(255,255,255,0.06);
-  }
-  .cam-tag:hover { color: var(--fg); }
 </style>
 </head>
 <body>
 
 <video id="bg-video" autoplay muted playsinline></video>
 <div class="bg-overlay"></div>
+<div class="stage-spot"></div>
 
 <div class="screen-login" id="screen-login">
-  <div class="login glass">
+  <div class="login card">
     <h1>Mower Control</h1>
     <p class="sub">Sign in to drive.</p>
     <input id="username" type="text" placeholder="Username"
@@ -362,56 +451,138 @@
            autocomplete="current-password" />
     <button id="login-btn">Log in</button>
     <p id="login-err" class="err"></p>
-    <p class="hint">
-      Hold direction buttons to drive. Release = stop. Loss of connection = stop.
-    </p>
+    <p class="hint">Hold direction buttons to drive. Release = stop. Loss of connection = stop.</p>
   </div>
 </div>
 
 <div class="screen-controls" id="screen-controls" style="display: none;">
-  <!-- Top bar -->
   <div class="top-bar">
-    <div class="status-pill glass">
-      <span><span class="dot bad" id="conn-dot"></span> <span class="value" id="conn-text">disconnected</span></span>
-      <span><span class="label">latency</span><span class="value" id="latency">— ms</span></span>
+    <div class="brand card pill">
+      <span class="mark">F</span>
+      <span><span class="b1">FR1</span> <span class="b2">· Mower Control</span></span>
     </div>
-    <div class="top-actions glass">
-      <button id="setup-btn" class="icon-btn" title="Pi setup commands">Pi setup</button>
-      <button id="debug-btn" class="icon-btn" title="Debug notes">Debug</button>
-      <button id="logout-btn" class="icon-btn" title="Log out">Log out</button>
+    <div class="tabs card pill">
+      <button class="tab active">Drive</button>
+      <button class="tab" disabled title="Coming soon">Map</button>
+      <button class="tab" disabled title="Coming soon">Telemetry</button>
+    </div>
+    <div class="user-chip card pill">
+      <span class="name" id="user-name">Operator</span>
+      <span class="menu-btns">
+        <button id="setup-btn" title="Pi setup commands">Setup</button>
+        <button id="debug-btn" title="Debug notes">Debug</button>
+        <button id="logout-btn" title="Log out">Sign out</button>
+      </span>
+      <span class="avatar" id="user-avatar">O</span>
     </div>
   </div>
 
-  <!-- Middle (reserved for future widgets like map, telemetry, etc.) -->
-  <div class="middle-row"></div>
-
-  <!-- Bottom row -->
-  <div class="bottom-row">
-    <div class="action-stack">
-      <button id="btn-blade" class="action-btn blade-btn">
-        <span class="swatch"></span><span class="action-label">Blade off</span>
-      </button>
-      <button id="btn-estop" class="action-btn estop-btn">
-        <span class="swatch"></span>STOP
-      </button>
-    </div>
-    <div class="pad-card glass">
-      <div class="pad">
-        <button id="btn-fwd">▲</button>
-        <button id="btn-left">◀</button>
-        <button id="btn-right">▶</button>
-        <button id="btn-rev">▼</button>
+  <div class="stage">
+    <div class="col-left">
+      <div class="ident-card card">
+        <div class="eyebrow">Walk-behind &middot; Toro 21"</div>
+        <h2>Mower 01</h2>
+        <div class="sub">Self-propelled &middot; Gas &middot; Phase 1</div>
       </div>
+      <div class="info-row card pill">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s7-7 7-13a7 7 0 1 0-14 0c0 6 7 13 7 13z"/>
+          <circle cx="12" cy="9" r="2.5"/>
+        </svg>
+        <span id="loc-text">No GPS yet</span>
+      </div>
+      <div class="info-row card pill">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="10" rx="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+        <span>Auth &middot; session active</span>
+      </div>
+    </div>
+
+    <div class="col-center"></div>
+
+    <div class="col-right">
+      <div class="stat-card card with-dot bad" id="stat-link">
+        <span class="stat-label">Link</span>
+        <span class="stat-value"><span id="conn-text">disconnected</span></span>
+        <span class="stat-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M5 12.5a10 10 0 0 1 14 0"/><path d="M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19" r="1.5" fill="currentColor"/>
+          </svg>
+        </span>
+      </div>
+      <div class="stat-card card">
+        <span class="stat-label">Latency</span>
+        <span class="stat-value" id="latency-val">&mdash;<span class="unit">ms</span></span>
+        <span class="stat-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+          </svg>
+        </span>
+      </div>
+      <div class="stat-card card">
+        <span class="stat-label">Speed</span>
+        <span class="stat-value" id="speed-val">0.0<span class="unit">m/s</span></span>
+        <span class="stat-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"/><path d="M12 12l4-4"/><path d="M3 12h2M19 12h2"/>
+          </svg>
+        </span>
+      </div>
+      <div class="stat-card card">
+        <span class="stat-label">Heading</span>
+        <span class="stat-value" id="heading-val">&mdash;<span class="unit">&deg;</span></span>
+        <span class="stat-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"/><path d="M12 4l3 9-3-2-3 2 3-9z" fill="currentColor"/>
+          </svg>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-bar">
+    <div class="mini-tiles">
+      <div class="mini-tile card pill" id="tile-blade">
+        <span class="mt-dot"></span>
+        <span class="mt-label">Blade</span>
+        <span class="mt-value" id="tile-blade-val">off</span>
+      </div>
+      <div class="mini-tile card pill" id="tile-drive">
+        <span class="mt-dot"></span>
+        <span class="mt-label">Drive</span>
+        <span class="mt-value" id="tile-drive-val">stop</span>
+      </div>
+    </div>
+
+    <div class="pad-card card">
+      <div class="pad">
+        <button id="btn-fwd">&#9650;</button>
+        <button id="btn-left">&#9664;</button>
+        <button id="btn-right">&#9654;</button>
+        <button id="btn-rev">&#9660;</button>
+      </div>
+    </div>
+
+    <div class="cta-stack">
+      <button id="btn-blade" class="cta cta-blade">
+        <span class="cta-label">Engage blade</span>
+        <span class="arrow">&rarr;</span>
+      </button>
+      <button id="btn-estop" class="cta cta-stop">STOP</button>
     </div>
   </div>
 </div>
 
-<button class="cam-tag" id="cam-tag" title="Click to toggle camera">camera: off</button>
+<div class="cam-tag" id="cam-tag" title="Click to toggle camera">
+  <span class="cam-dot"></span><span id="cam-tag-text">camera: off</span>
+</div>
 
 <div class="modal-bg" id="setup-modal">
   <div class="modal">
-    <h2>Pi setup <button id="setup-close" title="Close">×</button></h2>
-    <p>SSH into the Pi, then run these commands. The mower token is embedded — keep this page private.</p>
+    <h2>Pi setup <button id="setup-close" title="Close">&times;</button></h2>
+    <p>SSH into the Pi, then run these commands. The mower token is embedded &mdash; keep this page private.</p>
 
     <div class="step">
       <div class="step-label">
@@ -438,14 +609,14 @@
     </div>
 
     <p id="setup-missing" style="color: var(--warn); display: none;">
-      Pi setup commands aren't available — set <code>MOWER_TOKEN</code> in Vercel env vars and log in again.
+      Pi setup commands aren't available &mdash; set <code>MOWER_TOKEN</code> in Vercel env vars and log in again.
     </p>
   </div>
 </div>
 
 <div class="modal-bg" id="debug-modal">
   <div class="modal">
-    <h2>Debug notes <button id="debug-close" title="Close">×</button></h2>
+    <h2>Debug notes <button id="debug-close" title="Close">&times;</button></h2>
     <p>Scratch pad for shuttling Pi errors / log lines back to the laptop. Auto-saved in this browser only.</p>
     <div class="step">
       <div class="step-label">
@@ -455,17 +626,17 @@
           <button id="debug-clear" title="Clear notes">Clear</button>
         </span>
       </div>
-      <textarea id="debug-text" placeholder="Paste error output, journalctl excerpts, anything you want to share back…" spellcheck="false" autocapitalize="off" autocorrect="off"></textarea>
+      <textarea id="debug-text" placeholder="Paste error output, journalctl excerpts, anything you want to share back&hellip;" spellcheck="false" autocapitalize="off" autocorrect="off"></textarea>
     </div>
   </div>
 </div>
 
 <script>
 (() => {
-  // ---- State ----
-  const SEND_PERIOD_MS = 50; // 20Hz command rate
+  const SEND_PERIOD_MS = 50;
   const RELAY_URL_FALLBACK = 'wss://physical-mover-control-production.up.railway.app/operator';
   const SESSION_KEY = 'mower-session';
+  const DEBUG_KEY = 'mower-debug-notes';
 
   let ws = null;
   let sendTimer = null;
@@ -475,17 +646,20 @@
   let lastEchoAt = 0;
   let camStream = null;
 
-  // ---- DOM ----
   const $ = (id) => document.getElementById(id);
   const screenLogin = $('screen-login');
   const screenCtl = $('screen-controls');
-  const connDot = $('conn-dot');
   const connText = $('conn-text');
-  const latencyEl = $('latency');
+  const statLink = $('stat-link');
+  const latencyVal = $('latency-val');
+  const tileDrive = $('tile-drive');
+  const tileDriveVal = $('tile-drive-val');
+  const tileBlade = $('tile-blade');
+  const tileBladeVal = $('tile-blade-val');
   const bgVideo = $('bg-video');
   const camTag = $('cam-tag');
+  const camTagText = $('cam-tag-text');
 
-  // ---- Session helpers ----
   function loadSession() {
     try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); }
     catch { return null; }
@@ -494,7 +668,6 @@
   function clearSession() { localStorage.removeItem(SESSION_KEY); }
 
   function setLoginError(msg) { $('login-err').textContent = msg || ''; }
-
   function showLogin(focusUser) {
     cleanup();
     screenCtl.style.display = 'none';
@@ -505,18 +678,26 @@
     screenLogin.style.display = 'none';
     screenCtl.style.display = 'grid';
   }
+  function setUserName(name) {
+    if (!name) return;
+    $('user-name').textContent = name;
+    $('user-avatar').textContent = (name[0] || 'O').toUpperCase();
+  }
 
-  // ---- Camera (background video) ----
-  function setCamTag(text) { camTag.textContent = 'camera: ' + text; }
+  // Camera
+  function setCamTag(text, live) {
+    camTagText.textContent = 'camera: ' + text;
+    camTag.classList.toggle('live', !!live);
+  }
   function setNoVideoBg(on) { document.body.classList.toggle('no-video', on); }
 
   async function startCamera() {
     if (camStream) return;
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setCamTag('unsupported'); setNoVideoBg(true); return;
+      setCamTag('unsupported', false); setNoVideoBg(true); return;
     }
     try {
-      setCamTag('requesting…');
+      setCamTag('requesting...', false);
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 1920 }, height: { ideal: 1080 } },
         audio: false
@@ -526,12 +707,12 @@
       setNoVideoBg(false);
       const track = stream.getVideoTracks()[0];
       const label = (track && track.label) ? track.label.split('(')[0].trim() : 'on';
-      setCamTag(label);
+      setCamTag(label, true);
     } catch (e) {
       setNoVideoBg(true);
-      if (e && e.name === 'NotAllowedError') setCamTag('permission denied');
-      else if (e && e.name === 'NotFoundError') setCamTag('no device');
-      else setCamTag('error');
+      if (e && e.name === 'NotAllowedError') setCamTag('permission denied', false);
+      else if (e && e.name === 'NotFoundError') setCamTag('no device', false);
+      else setCamTag('error', false);
     }
   }
   function stopCamera() {
@@ -541,13 +722,13 @@
       bgVideo.srcObject = null;
     }
     setNoVideoBg(true);
-    setCamTag('off');
+    setCamTag('off', false);
   }
   camTag.addEventListener('click', () => {
     if (camStream) stopCamera(); else startCamera();
   });
 
-  // ---- Login ----
+  // Login
   $('login-btn').addEventListener('click', doLogin);
   $('username').addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
   $('password').addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
@@ -562,15 +743,12 @@
     setLoginError('');
     const btn = $('login-btn');
     btn.disabled = true;
-    btn.textContent = 'Logging in…';
+    btn.textContent = 'Logging in...';
     try {
       const params = new URLSearchParams();
       params.append('username', username);
       params.append('password', password);
-      const res = await fetch('/api/login', {
-        method: 'POST',
-        body: params
-      });
+      const res = await fetch('/api/login', { method: 'POST', body: params });
       if (!res.ok) {
         if (res.status === 401) setLoginError('Wrong username or password.');
         else if (res.status === 500) setLoginError('Server not configured. Set Vercel env vars.');
@@ -581,9 +759,11 @@
       const session = {
         token: data.token,
         relayUrl: data.relayUrl || RELAY_URL_FALLBACK,
-        piSetup: data.piSetup || null
+        piSetup: data.piSetup || null,
+        username
       };
       saveSession(session);
+      setUserName(username);
       renderPiSetup(session.piSetup);
       $('password').value = '';
       startCamera();
@@ -596,7 +776,6 @@
     }
   }
 
-  // ---- Logout ----
   $('logout-btn').addEventListener('click', () => {
     clearSession();
     $('password').value = '';
@@ -604,19 +783,21 @@
     showLogin(true);
   });
 
-  // ---- Connection ----
-  function setConn(state, text) {
-    connDot.className = 'dot ' + state;
+  // Connection
+  function setLinkState(state, text) {
+    statLink.classList.remove('warn', 'bad');
+    if (state === 'bad') statLink.classList.add('bad');
+    else if (state === 'warn') statLink.classList.add('warn');
     connText.textContent = text;
   }
 
   function connect(url, token) {
-    setConn('warn', 'connecting…');
+    setLinkState('warn', 'connecting...');
     const sep = url.includes('?') ? '&' : '?';
     ws = new WebSocket(url + sep + 'token=' + encodeURIComponent(token));
 
     ws.onopen = () => {
-      setConn('ok', 'connected');
+      setLinkState('ok', 'connected');
       showControls();
       startSending();
     };
@@ -624,23 +805,15 @@
       stopSending();
       if (ev.code === 4401) {
         clearSession();
-        setConn('bad', 'login required');
+        setLinkState('bad', 'login required');
         showLogin(true);
         setLoginError('Session expired. Please log in again.');
       } else {
-        setConn('bad', 'disconnected');
+        setLinkState('bad', 'disconnected');
       }
     };
-    ws.onerror = () => setConn('bad', 'error');
-    ws.onmessage = (ev) => {
-      lastEchoAt = performance.now();
-      try {
-        const msg = JSON.parse(ev.data);
-        if (msg && msg.type === 'notes_update') applyServerNotes(msg.text);
-      } catch {
-        // ignore non-JSON
-      }
-    };
+    ws.onerror = () => setLinkState('bad', 'error');
+    ws.onmessage = () => { lastEchoAt = performance.now(); };
   }
 
   function cleanup() {
@@ -648,11 +821,11 @@
     if (ws) { try { ws.close(); } catch (e) {} ws = null; }
   }
 
-  // ---- Direction buttons ----
+  // Direction buttons
   function bindHold(id, key) {
     const el = $(id);
-    const press = (e) => { e.preventDefault(); held[key] = true; el.classList.add('held'); };
-    const release = (e) => { e.preventDefault(); held[key] = false; el.classList.remove('held'); };
+    const press = (e) => { e.preventDefault(); held[key] = true; el.classList.add('held'); updateDriveTile(); };
+    const release = (e) => { e.preventDefault(); held[key] = false; el.classList.remove('held'); updateDriveTile(); };
     el.addEventListener('touchstart', press, { passive: false });
     el.addEventListener('touchend', release);
     el.addEventListener('touchcancel', release);
@@ -665,23 +838,44 @@
   bindHold('btn-left', 'left');
   bindHold('btn-right', 'right');
 
+  function updateDriveTile() {
+    const parts = [];
+    if (held.fwd) parts.push('FWD');
+    if (held.rev) parts.push('REV');
+    if (held.left) parts.push('L');
+    if (held.right) parts.push('R');
+    const txt = parts.length ? parts.join(' ') : 'stop';
+    tileDriveVal.textContent = txt;
+    tileDrive.classList.toggle('ok', parts.length > 0);
+  }
+
   window.addEventListener('blur', () => {
     held.fwd = held.rev = held.left = held.right = false;
-    blade = false; updateBladeBtn();
+    blade = false; updateBladeBtn(); updateDriveTile();
     document.querySelectorAll('.pad button').forEach(b => b.classList.remove('held'));
   });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       held.fwd = held.rev = held.left = held.right = false;
+      updateDriveTile();
     }
   });
 
-  // ---- Blade + E-stop ----
+  // Blade + E-stop
   function updateBladeBtn() {
     const b = $('btn-blade');
-    const label = b.querySelector('.action-label');
-    if (blade) { b.classList.add('on'); label.textContent = 'Blade ON'; }
-    else { b.classList.remove('on'); label.textContent = 'Blade off'; }
+    const label = b.querySelector('.cta-label');
+    if (blade) {
+      b.classList.add('on');
+      label.textContent = 'Blade ON';
+      tileBlade.classList.add('warn'); tileBlade.classList.remove('ok');
+      tileBladeVal.textContent = 'ENGAGED';
+    } else {
+      b.classList.remove('on');
+      label.textContent = 'Engage blade';
+      tileBlade.classList.remove('warn', 'ok');
+      tileBladeVal.textContent = 'off';
+    }
   }
   $('btn-blade').addEventListener('click', () => {
     if (!blade) {
@@ -691,12 +885,11 @@
   });
   $('btn-estop').addEventListener('click', () => {
     held.fwd = held.rev = held.left = held.right = false;
-    blade = false; updateBladeBtn();
+    blade = false; updateBladeBtn(); updateDriveTile();
     document.querySelectorAll('.pad button').forEach(b => b.classList.remove('held'));
     sendCommand();
   });
 
-  // ---- Send loop ----
   function computeCommand() {
     let drive = 0, steer = 0;
     if (held.fwd) drive += 1;
@@ -713,7 +906,9 @@
     lastSentAt = performance.now();
     if (lastEchoAt > 0) {
       const lat = Math.round(lastSentAt - lastEchoAt);
-      if (Math.abs(lat) < 5000) latencyEl.textContent = lat + ' ms';
+      if (Math.abs(lat) < 5000) {
+        latencyVal.innerHTML = lat + '<span class="unit">ms</span>';
+      }
     }
   }
   function startSending() {
@@ -724,7 +919,14 @@
     if (sendTimer) { clearInterval(sendTimer); sendTimer = null; }
   }
 
-  // ---- Pi setup modal ----
+  function flashBtn(btn, text, ms) {
+    const orig = btn.textContent;
+    btn.textContent = text;
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, ms || 1200);
+  }
+
+  // Pi setup modal
   function renderPiSetup(setup) {
     const missing = $('setup-missing');
     if (!setup) {
@@ -755,9 +957,8 @@
     btn.addEventListener('click', async () => {
       const text = $(btn.dataset.target).textContent;
       if (!text) return;
-      try {
-        await navigator.clipboard.writeText(text);
-      } catch {
+      try { await navigator.clipboard.writeText(text); }
+      catch {
         const r = document.createRange();
         r.selectNodeContents($(btn.dataset.target));
         const sel = window.getSelection();
@@ -765,44 +966,16 @@
         try { document.execCommand('copy'); } catch {}
         sel.removeAllRanges();
       }
-      const orig = btn.textContent;
-      btn.textContent = 'Copied';
-      btn.classList.add('copied');
-      setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1200);
+      flashBtn(btn, 'Copied');
     });
   });
 
-  // ---- Debug notes (shared across devices via the relay) ----
-  const DEBUG_KEY = 'mower-debug-notes';
-  const NOTES_DEBOUNCE_MS = 400;
+  // Debug notes modal
   const debugTextEl = $('debug-text');
   debugTextEl.value = localStorage.getItem(DEBUG_KEY) || '';
-  let _notesSendTimer = null;
-  let _notesSuppressSend = false;  // true while applying server-pushed update
   debugTextEl.addEventListener('input', () => {
     localStorage.setItem(DEBUG_KEY, debugTextEl.value);
-    if (_notesSuppressSend) return;
-    if (_notesSendTimer) clearTimeout(_notesSendTimer);
-    _notesSendTimer = setTimeout(() => {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'notes_set', text: debugTextEl.value }));
-      }
-    }, NOTES_DEBOUNCE_MS);
   });
-  function applyServerNotes(text) {
-    if (typeof text !== 'string') return;
-    if (debugTextEl.value === text) return;
-    const wasFocused = document.activeElement === debugTextEl;
-    const start = debugTextEl.selectionStart;
-    const end = debugTextEl.selectionEnd;
-    _notesSuppressSend = true;
-    debugTextEl.value = text;
-    _notesSuppressSend = false;
-    localStorage.setItem(DEBUG_KEY, text);
-    if (wasFocused) {
-      try { debugTextEl.setSelectionRange(start, end); } catch {}
-    }
-  }
   $('debug-btn').addEventListener('click', () => {
     $('debug-modal').classList.add('show');
     setTimeout(() => debugTextEl.focus(), 0);
@@ -813,18 +986,11 @@
   $('debug-modal').addEventListener('click', (e) => {
     if (e.target === $('debug-modal')) $('debug-modal').classList.remove('show');
   });
-  function flashBtn(btn, text, ms) {
-    const orig = btn.textContent;
-    btn.textContent = text;
-    btn.classList.add('copied');
-    setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, ms || 1200);
-  }
   $('debug-copy').addEventListener('click', async () => {
     const text = debugTextEl.value;
     if (!text) { flashBtn($('debug-copy'), 'Empty'); return; }
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
+    try { await navigator.clipboard.writeText(text); }
+    catch {
       debugTextEl.select();
       try { document.execCommand('copy'); } catch {}
       debugTextEl.setSelectionRange(0, 0);
@@ -838,12 +1004,15 @@
     }
   });
 
-  // ---- Boot ----
-  setNoVideoBg(true); // default to no-video gradient until camera starts
-  setCamTag('off');
+  // Boot
+  setNoVideoBg(true);
+  setCamTag('off', false);
+  updateBladeBtn();
+  updateDriveTile();
 
   const cached = loadSession();
   if (cached && cached.token) {
+    if (cached.username) setUserName(cached.username);
     renderPiSetup(cached.piSetup);
     startCamera();
     connect(cached.relayUrl || RELAY_URL_FALLBACK, cached.token);
