@@ -107,6 +107,52 @@
     font-size: 18px;
   }
   .row .blade.on { background: var(--warn); border-color: var(--warn); color: #000; }
+
+  .icon-btn {
+    background: none; color: var(--dim); border: none;
+    font-size: 14px; cursor: pointer; padding: 4px 8px;
+  }
+  .icon-btn:hover { color: var(--fg); }
+
+  .modal-bg {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    display: none; align-items: center; justify-content: center;
+    z-index: 10; padding: 12px;
+  }
+  .modal-bg.show { display: flex; }
+  .modal {
+    background: #111; border: 1px solid #333; border-radius: 12px;
+    padding: 20px; max-width: 640px; width: 100%;
+    max-height: 90vh; overflow-y: auto;
+  }
+  .modal h2 {
+    margin: 0 0 8px; font-size: 18px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .modal h2 button {
+    background: none; color: var(--dim); border: none;
+    font-size: 22px; cursor: pointer;
+  }
+  .modal p { color: var(--dim); font-size: 13px; margin: 4px 0 16px; }
+  .modal .step { margin-bottom: 16px; }
+  .modal .step-label {
+    font-size: 13px; color: var(--dim); margin-bottom: 4px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .modal .step-label button {
+    background: var(--btn); color: var(--fg);
+    border: 1px solid #333; border-radius: 6px;
+    font-size: 12px; padding: 4px 10px; cursor: pointer;
+  }
+  .modal .step-label button.copied { background: var(--ok); border-color: var(--ok); color: #000; }
+  .modal pre {
+    margin: 0; padding: 10px; background: #000;
+    border: 1px solid #222; border-radius: 6px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px; color: var(--fg);
+    white-space: pre-wrap; word-break: break-all;
+    user-select: text; -webkit-user-select: text;
+  }
 </style>
 </head>
 <body>
@@ -130,8 +176,10 @@
   <div class="status-bar">
     <span><span class="dot bad" id="conn-dot"></span><span id="conn-text">disconnected</span></span>
     <span id="latency">— ms</span>
-    <button id="logout-btn" title="Log out"
-            style="background: none; color: var(--dim); border: none; font-size: 14px;">×</button>
+    <span>
+      <button id="setup-btn" class="icon-btn" title="Pi setup commands">Pi setup</button>
+      <button id="logout-btn" class="icon-btn" title="Log out">×</button>
+    </span>
   </div>
 
   <div class="controls">
@@ -145,6 +193,41 @@
       <button id="btn-blade" class="blade">BLADE OFF</button>
       <button id="btn-estop" class="estop">STOP</button>
     </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="setup-modal">
+  <div class="modal">
+    <h2>Pi setup <button id="setup-close" title="Close">×</button></h2>
+    <p>SSH into the Pi, then run these commands. The mower token is embedded — keep this page private.</p>
+
+    <div class="step">
+      <div class="step-label">
+        <span>1. Clone the repo</span>
+        <button class="copy-btn" data-target="cmd-clone">Copy</button>
+      </div>
+      <pre id="cmd-clone"></pre>
+    </div>
+
+    <div class="step">
+      <div class="step-label">
+        <span>2. Bootstrap (will prompt for sudo password)</span>
+        <button class="copy-btn" data-target="cmd-bootstrap">Copy</button>
+      </div>
+      <pre id="cmd-bootstrap"></pre>
+    </div>
+
+    <div class="step">
+      <div class="step-label">
+        <span>3. Tail the service logs</span>
+        <button class="copy-btn" data-target="cmd-logs">Copy</button>
+      </div>
+      <pre id="cmd-logs"></pre>
+    </div>
+
+    <p id="setup-missing" style="color: var(--warn); display: none;">
+      Pi setup commands aren't available — set <code>MOWER_TOKEN</code> in Vercel env vars and log in again.
+    </p>
   </div>
 </div>
 
@@ -224,9 +307,11 @@
       const data = await res.json();
       const session = {
         token: data.token,
-        relayUrl: data.relayUrl || RELAY_URL_FALLBACK
+        relayUrl: data.relayUrl || RELAY_URL_FALLBACK,
+        piSetup: data.piSetup || null
       };
       saveSession(session);
+      renderPiSetup(session.piSetup);
       $('password').value = '';
       connect(session.relayUrl, session.token);
     } catch (e) {
@@ -358,9 +443,58 @@
     if (sendTimer) { clearInterval(sendTimer); sendTimer = null; }
   }
 
+  // ---- Pi setup modal ----
+  function renderPiSetup(setup) {
+    const missing = $('setup-missing');
+    if (!setup) {
+      $('cmd-clone').textContent = '';
+      $('cmd-bootstrap').textContent = '';
+      $('cmd-logs').textContent = '';
+      missing.style.display = 'block';
+      return;
+    }
+    $('cmd-clone').textContent = setup.clone || '';
+    $('cmd-bootstrap').textContent = setup.bootstrap || '';
+    $('cmd-logs').textContent = setup.logs || '';
+    missing.style.display = 'none';
+  }
+
+  $('setup-btn').addEventListener('click', () => {
+    const s = loadSession();
+    renderPiSetup(s && s.piSetup);
+    $('setup-modal').classList.add('show');
+  });
+  $('setup-close').addEventListener('click', () => {
+    $('setup-modal').classList.remove('show');
+  });
+  $('setup-modal').addEventListener('click', (e) => {
+    if (e.target === $('setup-modal')) $('setup-modal').classList.remove('show');
+  });
+  document.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const text = $(btn.dataset.target).textContent;
+      if (!text) return;
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        const r = document.createRange();
+        r.selectNodeContents($(btn.dataset.target));
+        const sel = window.getSelection();
+        sel.removeAllRanges(); sel.addRange(r);
+        try { document.execCommand('copy'); } catch {}
+        sel.removeAllRanges();
+      }
+      const orig = btn.textContent;
+      btn.textContent = 'Copied';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1200);
+    });
+  });
+
   // ---- Boot: try cached session, else show login ----
   const cached = loadSession();
   if (cached && cached.token) {
+    renderPiSetup(cached.piSetup);
     connect(cached.relayUrl || RELAY_URL_FALLBACK, cached.token);
   } else {
     setTimeout(() => $('username').focus(), 0);

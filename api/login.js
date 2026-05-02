@@ -1,6 +1,8 @@
 const crypto = require('crypto');
 
 const RELAY_URL = 'wss://physical-mover-control-production.up.railway.app/operator';
+const MOWER_RELAY_URL = 'wss://physical-mover-control-production.up.railway.app/mower';
+const REPO_URL = 'https://github.com/fr1-ai/physical-mover-control.git';
 
 function timingSafeEqualStr(a, b) {
   const bufA = Buffer.from(a);
@@ -42,5 +44,12 @@ module.exports = async (req, res) => {
     return;
   }
 
-  res.status(200).json({ token, relayUrl: RELAY_URL });
+  const mowerToken = process.env.MOWER_TOKEN || '';
+  const piSetup = mowerToken ? {
+    clone: `git clone ${REPO_URL} ~/physical-mover-control`,
+    bootstrap: `cd ~/physical-mover-control && RELAY_URL=${MOWER_RELAY_URL} MOWER_TOKEN=${mowerToken} bash scripts/bootstrap.sh`,
+    logs: 'journalctl -u mower-client -f'
+  } : null;
+
+  res.status(200).json({ token, relayUrl: RELAY_URL, piSetup });
 };
