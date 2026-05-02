@@ -69,6 +69,13 @@ class SteeringServo:
 
         try:
             self._chip = lgpio.gpiochip_open(0)
+            # tx_servo requires the line to be claimed for output first.
+            # If a previous run left it claimed, free it and retry.
+            try:
+                lgpio.gpio_claim_output(self._chip, self._gpio, 0)
+            except lgpio.error:
+                lgpio.gpio_free(self._chip, self._gpio)
+                lgpio.gpio_claim_output(self._chip, self._gpio, 0)
             # Center the servo immediately so first physical state is SAFE.
             lgpio.tx_servo(self._chip, self._gpio, CENTER_PULSE_US)
             self._last_pulse_us = CENTER_PULSE_US
@@ -78,6 +85,9 @@ class SteeringServo:
             )
         except (OSError, RuntimeError, ValueError, AttributeError) as e:
             log.exception("failed to initialize steering servo: %s", e)
+            if self._chip is not None:
+                try: lgpio.gpiochip_close(self._chip)
+                except Exception: pass
             self._chip = None
 
     def set_normalized(self, value: float) -> None:
@@ -128,10 +138,10 @@ class SteeringServo:
             with self._lock:
                 if self._chip is not None:
                     # 0 disables the servo pulse train.
-                    try:
-                        lgpio.tx_servo(self._chip, self._gpio, 0)
-                    except (OSError, RuntimeError, ValueError):
-                        pass
+                    try: lgpio.tx_servo(self._chip, self._gpio, 0)
+                    except Exception: pass
+                    try: lgpio.gpio_free(self._chip, self._gpio)
+                    except Exception: pass
                     lgpio.gpiochip_close(self._chip)
                     self._chip = None
             log.info("steering servo closed")
