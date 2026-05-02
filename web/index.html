@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<title>Mower Control</title>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --fg: #e0e0e0;
+    --dim: #666;
+    --ok: #22c55e;
+    --warn: #f59e0b;
+    --bad: #ef4444;
+    --btn: #1f2937;
+    --btn-active: #2563eb;
+    --estop: #dc2626;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg); color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .screen {
+    display: flex; flex-direction: column;
+    height: 100vh; padding: 12px;
+  }
+  .status-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 12px; background: #111; border-radius: 8px;
+    font-size: 14px;
+  }
+  .dot {
+    display: inline-block; width: 10px; height: 10px;
+    border-radius: 50%; margin-right: 6px;
+    vertical-align: middle;
+  }
+  .dot.ok { background: var(--ok); }
+  .dot.warn { background: var(--warn); }
+  .dot.bad { background: var(--bad); }
+
+  .login {
+    margin: auto; max-width: 320px; width: 100%;
+    background: #111; padding: 24px; border-radius: 12px;
+  }
+  .login h1 { margin: 0 0 16px; font-size: 22px; }
+  .login input {
+    width: 100%; padding: 12px; margin-bottom: 12px;
+    background: #1f1f1f; border: 1px solid #333; color: var(--fg);
+    border-radius: 8px; font-size: 16px;
+  }
+  .login button {
+    width: 100%; padding: 14px; background: var(--btn-active);
+    color: white; border: none; border-radius: 8px;
+    font-size: 16px; font-weight: 600;
+  }
+
+  .controls {
+    flex: 1; display: grid;
+    grid-template-rows: 1fr auto;
+    gap: 12px; margin-top: 12px;
+  }
+  .pad {
+    display: grid;
+    grid-template-areas:
+      ".    fwd  ."
+      "left .    right"
+      ".    rev  .";
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: 1fr 1fr 1fr;
+    gap: 8px;
+  }
+  .pad button {
+    background: var(--btn); color: var(--fg);
+    border: 2px solid #333; border-radius: 12px;
+    font-size: 28px; font-weight: 600;
+    transition: background 0.05s;
+    touch-action: manipulation;
+  }
+  .pad button:active, .pad button.held {
+    background: var(--btn-active);
+    border-color: var(--btn-active);
+  }
+  .pad #btn-fwd  { grid-area: fwd; }
+  .pad #btn-rev  { grid-area: rev; }
+  .pad #btn-left { grid-area: left; }
+  .pad #btn-right{ grid-area: right; }
+
+  .row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  }
+  .row button {
+    padding: 16px; border-radius: 12px; font-size: 16px; font-weight: 600;
+    border: 2px solid #333; background: var(--btn); color: var(--fg);
+  }
+  .row .estop {
+    background: var(--estop); border-color: var(--estop); color: white;
+    font-size: 18px;
+  }
+  .row .blade.on { background: var(--warn); border-color: var(--warn); color: #000; }
+</style>
+</head>
+<body>
+
+<div class="screen" id="screen-login">
+  <div class="login">
+    <h1>Mower Control</h1>
+    <input id="relay-url" type="text" placeholder="wss://your-app.up.railway.app/operator" />
+    <input id="token" type="password" placeholder="Operator token" />
+    <button id="connect-btn">Connect</button>
+    <p style="color: var(--dim); font-size: 12px; margin-top: 12px;">
+      Hold direction buttons to drive. Release = stop. Connection loss = stop.
+    </p>
+  </div>
+</div>
+
+<div class="screen" id="screen-controls" style="display: none;">
+  <div class="status-bar">
+    <span><span class="dot bad" id="conn-dot"></span><span id="conn-text">disconnected</span></span>
+    <span id="latency">— ms</span>
+    <button id="disconnect-btn" style="background: none; color: var(--dim); border: none; font-size: 14px;">×</button>
+  </div>
+
+  <div class="controls">
+    <div class="pad">
+      <button id="btn-fwd">▲</button>
+      <button id="btn-left">◀</button>
+      <button id="btn-right">▶</button>
+      <button id="btn-rev">▼</button>
+    </div>
+    <div class="row">
+      <button id="btn-blade" class="blade">BLADE OFF</button>
+      <button id="btn-estop" class="estop">STOP</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ---- State ----
+  const SEND_PERIOD_MS = 50; // 20Hz command rate
+  let ws = null;
+  let sendTimer = null;
+  const held = { fwd: false, rev: false, left: false, right: false };
+  let blade = false;
+  let lastSentAt = 0;
+  let lastEchoAt = 0;
+
+  // ---- DOM ----
+  const $ = (id) => document.getElementById(id);
+  const screenLogin = $('screen-login');
+  const screenCtl = $('screen-controls');
+  const connDot = $('conn-dot');
+  const connText = $('conn-text');
+  const latencyEl = $('latency');
+
+  // ---- Persist URL/token ----
+  $('relay-url').value = localStorage.getItem('relay-url') || '';
+  $('token').value = localStorage.getItem('operator-token') || '';
+
+  // ---- Connection ----
+  $('connect-btn').addEventListener('click', () => {
+    const url = $('relay-url').value.trim();
+    const token = $('token').value.trim();
+    if (!url || !token) { alert('URL and token required'); return; }
+    localStorage.setItem('relay-url', url);
+    localStorage.setItem('operator-token', token);
+    connect(url, token);
+  });
+
+  $('disconnect-btn').addEventListener('click', () => {
+    cleanup();
+    screenCtl.style.display = 'none';
+    screenLogin.style.display = 'flex';
+  });
+
+  function setConn(state, text) {
+    connDot.className = 'dot ' + state;
+    connText.textContent = text;
+  }
+
+  function connect(url, token) {
+    setConn('warn', 'connecting…');
+    // Browsers cannot set Authorization headers on WS handshake. Pass via subprotocol.
+    // The server reads it from the Sec-WebSocket-Protocol negotiation OR a query string.
+    // Simplest path: query string. Server should accept ?token= as fallback.
+    const sep = url.includes('?') ? '&' : '?';
+    ws = new WebSocket(url + sep + 'token=' + encodeURIComponent(token));
+
+    ws.onopen = () => {
+      setConn('ok', 'connected');
+      screenLogin.style.display = 'none';
+      screenCtl.style.display = 'flex';
+      startSending();
+    };
+    ws.onclose = () => {
+      setConn('bad', 'disconnected');
+      stopSending();
+    };
+    ws.onerror = () => setConn('bad', 'error');
+    ws.onmessage = (ev) => {
+      lastEchoAt = performance.now();
+      // Could parse status here later.
+    };
+  }
+
+  function cleanup() {
+    stopSending();
+    if (ws) { try { ws.close(); } catch (e) {} ws = null; }
+  }
+
+  // ---- Direction buttons ----
+  function bindHold(id, key) {
+    const el = $(id);
+    const press = (e) => { e.preventDefault(); held[key] = true; el.classList.add('held'); };
+    const release = (e) => { e.preventDefault(); held[key] = false; el.classList.remove('held'); };
+    el.addEventListener('touchstart', press, { passive: false });
+    el.addEventListener('touchend', release);
+    el.addEventListener('touchcancel', release);
+    el.addEventListener('mousedown', press);
+    el.addEventListener('mouseup', release);
+    el.addEventListener('mouseleave', release);
+  }
+  bindHold('btn-fwd', 'fwd');
+  bindHold('btn-rev', 'rev');
+  bindHold('btn-left', 'left');
+  bindHold('btn-right', 'right');
+
+  // Release everything if user switches tabs / minimizes — fail-safe.
+  window.addEventListener('blur', () => {
+    held.fwd = held.rev = held.left = held.right = false;
+    blade = false; updateBladeBtn();
+    document.querySelectorAll('.pad button').forEach(b => b.classList.remove('held'));
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      held.fwd = held.rev = held.left = held.right = false;
+    }
+  });
+
+  // ---- Blade + E-stop ----
+  function updateBladeBtn() {
+    const b = $('btn-blade');
+    if (blade) { b.classList.add('on'); b.textContent = 'BLADE ON'; }
+    else { b.classList.remove('on'); b.textContent = 'BLADE OFF'; }
+  }
+  $('btn-blade').addEventListener('click', () => {
+    if (!blade) {
+      if (!confirm('Engage blade?')) return;
+    }
+    blade = !blade; updateBladeBtn();
+  });
+  $('btn-estop').addEventListener('click', () => {
+    held.fwd = held.rev = held.left = held.right = false;
+    blade = false; updateBladeBtn();
+    document.querySelectorAll('.pad button').forEach(b => b.classList.remove('held'));
+    sendCommand(); // immediate
+  });
+
+  // ---- Send loop ----
+  function computeCommand() {
+    let drive = 0, steer = 0;
+    if (held.fwd) drive += 1;
+    if (held.rev) drive -= 1;
+    if (held.right) steer += 1;
+    if (held.left) steer -= 1;
+    return { drive, steer, blade };
+  }
+  function sendCommand() {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    const cmd = computeCommand();
+    const msg = { type: 'command', drive: cmd.drive, steer: cmd.steer, blade: cmd.blade, t: Date.now() };
+    ws.send(JSON.stringify(msg));
+    lastSentAt = performance.now();
+    if (lastEchoAt > 0) {
+      const lat = Math.round(lastSentAt - lastEchoAt);
+      // Display only if recent
+      if (Math.abs(lat) < 5000) latencyEl.textContent = lat + ' ms';
+    }
+  }
+  function startSending() {
+    stopSending();
+    sendTimer = setInterval(sendCommand, SEND_PERIOD_MS);
+  }
+  function stopSending() {
+    if (sendTimer) { clearInterval(sendTimer); sendTimer = null; }
+  }
+})();
+</script>
+</body>
+</html>
