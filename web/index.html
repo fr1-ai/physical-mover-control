@@ -906,12 +906,26 @@
     if (held.left) steer -= 1;
     return { drive, steer, blade };
   }
+  // Only send a command when state actually changes (or as a periodic
+  // refresh in case a single packet is dropped). Idle sessions go silent
+  // so they don't fight other operators' commands at the relay.
+  let lastSentStateKey = null;
+  let lastSentStateAt = 0;
+  const STATE_REFRESH_MS = 1000;
   function sendCommand() {
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
     const cmd = computeCommand();
+    const stateKey = cmd.drive + ',' + cmd.steer + ',' + (cmd.blade ? 1 : 0);
+    const now = performance.now();
+    const stateChanged = stateKey !== lastSentStateKey;
+    const refreshDue = (now - lastSentStateAt) >= STATE_REFRESH_MS;
+    if (!stateChanged && !refreshDue) return;
+
     const msg = { type: 'command', drive: cmd.drive, steer: cmd.steer, blade: cmd.blade, t: Date.now() };
     ws.send(JSON.stringify(msg));
-    lastSentAt = performance.now();
+    lastSentStateKey = stateKey;
+    lastSentStateAt = now;
+    lastSentAt = now;
     if (lastEchoAt > 0) {
       const lat = Math.round(lastSentAt - lastEchoAt);
       if (Math.abs(lat) < 5000) {
@@ -921,6 +935,8 @@
   }
   function startSending() {
     stopSending();
+    lastSentStateKey = null;  // force the first tick after (re)connect
+    lastSentStateAt = 0;
     sendTimer = setInterval(sendCommand, SEND_PERIOD_MS);
   }
   function stopSending() {
