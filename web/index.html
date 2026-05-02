@@ -109,7 +109,7 @@
 <div class="screen" id="screen-login">
   <div class="login">
     <h1>Mower Control</h1>
-    <input id="relay-url" type="text" placeholder="wss://your-app.up.railway.app/operator" />
+    <input id="relay-url" type="text" placeholder="wss://physical-mover-control-production.up.railway.app/operator" />
     <input id="token" type="password" placeholder="Operator token" />
     <button id="connect-btn">Connect</button>
     <p style="color: var(--dim); font-size: 12px; margin-top: 12px;">
@@ -159,7 +159,7 @@
   const latencyEl = $('latency');
 
   // ---- Persist URL/token ----
-  $('relay-url').value = localStorage.getItem('relay-url') || '';
+  $('relay-url').value = localStorage.getItem('relay-url') || 'wss://physical-mover-control-production.up.railway.app/operator';
   $('token').value = localStorage.getItem('operator-token') || '';
 
   // ---- Connection ----
