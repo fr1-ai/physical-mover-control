@@ -37,6 +37,8 @@ from typing import Optional
 import websockets
 from websockets.exceptions import ConnectionClosed
 
+from outputs import SteeringServo
+
 # ---------------------------------------------------------------------------
 # Configuration (env vars with safe defaults)
 # ---------------------------------------------------------------------------
@@ -72,10 +74,11 @@ shutdown_event = threading.Event()
 
 
 # ---------------------------------------------------------------------------
-# Output layer (TODO: replace with real GPIO in later phase)
+# Output layer
 # ---------------------------------------------------------------------------
 
 _last_printed_state: Optional[tuple] = None
+_steering_servo: Optional[SteeringServo] = None
 
 
 def apply_outputs(drive: float, steer: float, blade: bool, reason: str) -> None:
@@ -88,6 +91,8 @@ def apply_outputs(drive: float, steer: float, blade: bool, reason: str) -> None:
             drive, steer, "ON" if blade else "off", reason,
         )
         _last_printed_state = state_tuple
+    if _steering_servo is not None:
+        _steering_servo.set_normalized(steer)
 
 
 def go_safe(reason: str) -> None:
@@ -134,6 +139,8 @@ def watchdog_loop() -> None:
 
 async def handle_message(raw: str) -> None:
     """Parse and validate one inbound message from the relay."""
+    global last_heartbeat_ns
+
     try:
         msg = json.loads(raw)
     except json.JSONDecodeError:
@@ -149,7 +156,6 @@ async def handle_message(raw: str) -> None:
         blade = bool(msg.get("blade", False))
 
         with state_lock:
-            global last_heartbeat_ns
             last_heartbeat_ns = time.monotonic_ns()
             latest_command["drive"] = drive
             latest_command["steer"] = steer
@@ -158,7 +164,6 @@ async def handle_message(raw: str) -> None:
     elif msg_type == "ping":
         # Heartbeat-only message. Resets the watchdog without changing command.
         with state_lock:
-            global last_heartbeat_ns  # noqa: F811
             last_heartbeat_ns = time.monotonic_ns()
 
     else:
@@ -231,6 +236,9 @@ def main() -> None:
     install_signal_handlers()
     log.info("starting mower client; relay=%s", RELAY_URL)
 
+    global _steering_servo
+    _steering_servo = SteeringServo()
+
     wd_thread = threading.Thread(target=watchdog_loop, daemon=True, name="watchdog")
     wd_thread.start()
 
@@ -241,6 +249,8 @@ def main() -> None:
     finally:
         shutdown_event.set()
         wd_thread.join(timeout=1.0)
+        if _steering_servo is not None:
+            _steering_servo.close()
         log.info("clean exit")
 
 
