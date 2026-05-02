@@ -1,10 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "outputDirectory": "web",
-  "functions": {
-    "api/login.js": {
-      "memory": 128,
-      "maxDuration": 5
-    }
-  }
+  "outputDirectory": "web"
 }
