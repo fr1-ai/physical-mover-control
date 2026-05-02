@@ -208,10 +208,12 @@
     btn.disabled = true;
     btn.textContent = 'Logging in…';
     try {
+      const params = new URLSearchParams();
+      params.append('username', username);
+      params.append('password', password);
       const res = await fetch('/api/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
+        body: params
       });
       if (!res.ok) {
         if (res.status === 401) setLoginError('Wrong username or password.');
