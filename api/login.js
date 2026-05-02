@@ -47,7 +47,12 @@ module.exports = async (req, res) => {
   const mowerToken = process.env.MOWER_TOKEN || '';
   const piSetup = mowerToken ? {
     clone: `git clone ${REPO_URL} ~/physical-mover-control`,
-    bootstrap: `cd ~/physical-mover-control && RELAY_URL=${MOWER_RELAY_URL} MOWER_TOKEN=${mowerToken} bash scripts/bootstrap.sh`,
+    bootstrap: [
+      'cd ~/physical-mover-control',
+      `export RELAY_URL=${MOWER_RELAY_URL}`,
+      `export MOWER_TOKEN=${mowerToken}`,
+      'bash scripts/bootstrap.sh'
+    ].join('\n'),
     logs: 'journalctl -u mower-client -f'
   } : null;
 
