@@ -1,7 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "outputDirectory": "web",
-  "framework": null,
-  "buildCommand": null,
-  "installCommand": null
+  "functions": {
+    "api/login.js": {
+      "memory": 128,
+      "maxDuration": 5
+    }
+  }
 }
