@@ -632,7 +632,15 @@
       }
     };
     ws.onerror = () => setConn('bad', 'error');
-    ws.onmessage = () => { lastEchoAt = performance.now(); };
+    ws.onmessage = (ev) => {
+      lastEchoAt = performance.now();
+      try {
+        const msg = JSON.parse(ev.data);
+        if (msg && msg.type === 'notes_update') applyServerNotes(msg.text);
+      } catch {
+        // ignore non-JSON
+      }
+    };
   }
 
   function cleanup() {
@@ -764,13 +772,37 @@
     });
   });
 
-  // ---- Debug notes ----
+  // ---- Debug notes (shared across devices via the relay) ----
   const DEBUG_KEY = 'mower-debug-notes';
+  const NOTES_DEBOUNCE_MS = 400;
   const debugTextEl = $('debug-text');
   debugTextEl.value = localStorage.getItem(DEBUG_KEY) || '';
+  let _notesSendTimer = null;
+  let _notesSuppressSend = false;  // true while applying server-pushed update
   debugTextEl.addEventListener('input', () => {
     localStorage.setItem(DEBUG_KEY, debugTextEl.value);
+    if (_notesSuppressSend) return;
+    if (_notesSendTimer) clearTimeout(_notesSendTimer);
+    _notesSendTimer = setTimeout(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'notes_set', text: debugTextEl.value }));
+      }
+    }, NOTES_DEBOUNCE_MS);
   });
+  function applyServerNotes(text) {
+    if (typeof text !== 'string') return;
+    if (debugTextEl.value === text) return;
+    const wasFocused = document.activeElement === debugTextEl;
+    const start = debugTextEl.selectionStart;
+    const end = debugTextEl.selectionEnd;
+    _notesSuppressSend = true;
+    debugTextEl.value = text;
+    _notesSuppressSend = false;
+    localStorage.setItem(DEBUG_KEY, text);
+    if (wasFocused) {
+      try { debugTextEl.setSelectionRange(start, end); } catch {}
+    }
+  }
   $('debug-btn').addEventListener('click', () => {
     $('debug-modal').classList.add('show');
     setTimeout(() => debugTextEl.focus(), 0);

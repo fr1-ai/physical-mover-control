@@ -65,12 +65,16 @@ log = logging.getLogger("relay")
 # Connection registry
 # ---------------------------------------------------------------------------
 
+NOTES_MAX_BYTES = 65536  # cap shared notes at 64 KB to bound memory
+
+
 class Hub:
     """Single source of truth for who's connected."""
 
     def __init__(self) -> None:
         self.mower: Optional[ServerConnection] = None
         self.operators: Set[ServerConnection] = set()
+        self.notes_text: str = ""
         self._lock = asyncio.Lock()
 
     async def set_mower(self, ws: ServerConnection) -> Optional[ServerConnection]:
@@ -111,6 +115,27 @@ class Hub:
                 await op.send(msg)
             except websockets.exceptions.WebSocketException:
                 pass
+
+    async def broadcast_to_operators_except(
+        self, msg: str, except_ws: ServerConnection
+    ) -> None:
+        async with self._lock:
+            targets = [op for op in self.operators if op is not except_ws]
+        for op in targets:
+            try:
+                await op.send(msg)
+            except websockets.exceptions.WebSocketException:
+                pass
+
+    async def get_notes(self) -> str:
+        async with self._lock:
+            return self.notes_text
+
+    async def set_notes(self, text: str) -> None:
+        if len(text) > NOTES_MAX_BYTES:
+            text = text[:NOTES_MAX_BYTES]
+        async with self._lock:
+            self.notes_text = text
 
 
 hub = Hub()
@@ -187,22 +212,41 @@ async def handle_mower(ws: ServerConnection) -> None:
 async def handle_operator(ws: ServerConnection) -> None:
     log.info("operator connected from %s", ws.remote_address)
     await hub.add_operator(ws)
+
+    # Push current shared notes to the new operator so all devices start in sync.
+    try:
+        notes = await hub.get_notes()
+        await ws.send(json.dumps({"type": "notes_update", "text": notes}))
+    except websockets.exceptions.WebSocketException:
+        pass
+
     try:
         async for raw in ws:
-            # Validate the message is JSON and a command type.
             try:
                 msg = json.loads(raw)
             except json.JSONDecodeError:
                 continue
-            if msg.get("type") != "command":
-                continue
-            ok = await hub.send_to_mower(raw)
-            if not ok:
-                # Tell operator the mower is offline.
-                try:
-                    await ws.send(json.dumps({"type": "error", "code": "mower_offline"}))
-                except websockets.exceptions.WebSocketException:
-                    pass
+
+            msg_type = msg.get("type")
+
+            if msg_type == "command":
+                ok = await hub.send_to_mower(raw)
+                if not ok:
+                    try:
+                        await ws.send(json.dumps({"type": "error", "code": "mower_offline"}))
+                    except websockets.exceptions.WebSocketException:
+                        pass
+
+            elif msg_type == "notes_set":
+                text = msg.get("text", "")
+                if not isinstance(text, str):
+                    continue
+                await hub.set_notes(text)
+                stored = await hub.get_notes()
+                broadcast = json.dumps({"type": "notes_update", "text": stored})
+                await hub.broadcast_to_operators_except(broadcast, ws)
+
+            # Other message types are ignored on purpose.
     except websockets.exceptions.ConnectionClosed:
         pass
     finally:
